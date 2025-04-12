@@ -1,54 +1,234 @@
-import { formatDistanceToNow } from "date-fns"
+import { formatDistanceToNow } from "date-fns";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Card, CardContent } from "@/components/ui/card"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
 
 type Expense = {
-  id: string
-  title: string
-  amount: number
-  paid_by: string
+  id: string;
+  title: string;
+  amount: number;
+  paid_by: string;
   users: {
-    id: string
-    name: string
-  }
-  created_at: string
-}
+    id: string;
+    name: string;
+  };
+  created_at: string;
+  note?: string | null;
+  split_count?: number;
+  split_with?: string[];
+};
 
-export function ExpenseList({ expenses, currentUserId }: { expenses: Expense[]; currentUserId: string }) {
+export function ExpenseList({
+  expenses,
+  currentUserId
+}: {
+  expenses: Expense[];
+  currentUserId: string;
+}) {
+  // Helper function to format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    }).format(date);
+  };
+
+  // Group expenses by date for timeline view
+  const groupExpensesByDate = (expenses: Expense[]) => {
+    const groups: { [key: string]: Expense[] } = {};
+
+    expenses.forEach(expense => {
+      const date = new Date(expense.created_at);
+      const dateKey = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+      ).toISOString();
+
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(expense);
+    });
+
+    return Object.entries(groups)
+      .map(([date, items]) => ({
+        date,
+        formattedDate: new Intl.DateTimeFormat("en-US", {
+          weekday: "long",
+          month: "short",
+          day: "numeric"
+        }).format(new Date(date)),
+        expenses: items
+      }))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
+
+  const groupedExpenses = groupExpensesByDate(expenses);
+
+  // Determine if amount is high, medium or low for better visual cues
+  const getAmountColorClass = (amount: number) => {
+    if (amount > 200)
+      return "from-red-200 to-red-100 text-red-700 border-red-200";
+    if (amount > 100)
+      return "from-orange-200 to-orange-100 text-orange-700 border-orange-200";
+    if (amount > 50)
+      return "from-yellow-200 to-yellow-100 text-yellow-700 border-yellow-200";
+    return "from-green-200 to-green-100 text-green-700 border-green-200";
+  };
+
+  // Helper to generate witty expense notes based on amount
+  const getRandomExpenseComment = (
+    amount: number,
+    isPaidByCurrentUser: boolean
+  ) => {
+    if (amount > 200) {
+      return isPaidByCurrentUser
+        ? "Ouch. That's ramen for a week."
+        : "They're never gonna financially recover from this.";
+    } else if (amount > 100) {
+      return isPaidByCurrentUser
+        ? "Your wallet felt that one."
+        : "Hope they weren't saving for anything important.";
+    } else if (amount > 50) {
+      return isPaidByCurrentUser
+        ? "That's a lot of dollar menu items."
+        : "They probably want that money back.";
+    } else if (amount > 20) {
+      return isPaidByCurrentUser
+        ? "There goes your coffee budget."
+        : "That's like 5 fancy coffees.";
+    } else {
+      return isPaidByCurrentUser
+        ? "Small price to pay. Probably."
+        : "They won't miss this... much.";
+    }
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="divide-y">
       {expenses.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center p-6">
-            <p className="text-center text-muted-foreground">No expenses yet. Lucky you. Or freeloading friends.</p>
-          </CardContent>
-        </Card>
+        <div className="p-4 text-center text-muted-foreground"></div>
       ) : (
-        expenses.map((expense) => (
-          <Card key={expense.id} className="overflow-hidden">
-            <CardContent className="p-0">
-              <div className="flex items-center gap-4 p-4">
-                <Avatar className="h-10 w-10 border">
-                  <AvatarFallback>
-                    {expense.paid_by === currentUserId ? "Y" : expense.users.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{expense.title}</p>
-                    <p className="font-bold">${expense.amount.toFixed(2)}</p>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <p>Paid by {expense.paid_by === currentUserId ? "You" : expense.users.name}</p>
-                    <p>{formatDistanceToNow(new Date(expense.created_at), { addSuffix: true })}</p>
-                  </div>
-                </div>
+        <div className="relative">
+          {groupedExpenses.map(group => (
+            <div key={group.date} className="mb-4">
+              <div className="sticky top-0 z-10 bg-white border-b p-3 shadow-sm">
+                <h3 className="font-medium text-xs text-slate-500">
+                  {group.formattedDate}
+                </h3>
               </div>
-            </CardContent>
-          </Card>
-        ))
+              <div className="relative">
+                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-slate-200"></div>
+
+                {group.expenses.map(expense => {
+                  const isPaidByCurrentUser = expense.paid_by === currentUserId;
+                  const amountColorClass = getAmountColorClass(expense.amount);
+
+                  return (
+                    <div
+                      key={expense.id}
+                      className="relative z-0 pl-10 pr-3 py-3 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-none"
+                    >
+                      <div className="absolute left-5 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white border-2 border-slate-300 z-10"></div>
+
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex items-start gap-2">
+                          <div
+                            className={`w-8 h-8 rounded-full bg-gradient-to-br ${amountColorClass} flex items-center justify-center text-xs font-semibold border shadow-sm flex-shrink-0`}
+                          >
+                            {expense.users.name
+                              .split(" ")
+                              .map(name => name.charAt(0))
+                              .join("")
+                              .toUpperCase()
+                              .substring(0, 2)}
+                          </div>
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h3 className="font-medium text-sm">
+                                {expense.title}
+                              </h3>
+                              <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full inline-flex items-center">
+                                {expense.split_count || 3} 👥
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 mr-1"></span>
+                              {isPaidByCurrentUser ? (
+                                <span>
+                                  You paid{" "}
+                                  <span className="font-medium">
+                                    ${expense.amount.toFixed(2)}
+                                  </span>
+                                </span>
+                              ) : (
+                                <span>
+                                  <span className="font-medium">
+                                    {expense.users.name}
+                                  </span>{" "}
+                                  paid{" "}
+                                  <span className="font-medium">
+                                    ${expense.amount.toFixed(2)}
+                                  </span>
+                                </span>
+                              )}
+                            </p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(expense.split_with || [])
+                                .slice(0, 3)
+                                .map((person, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center px-1.5 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full"
+                                  >
+                                    {person}
+                                  </span>
+                                ))}
+                              {(expense.split_with || []).length > 3 && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full">
+                                  +{(expense.split_with || []).length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right min-w-[120px] flex-shrink-0">
+                          <div className="text-xs font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded inline-block">
+                            {formatDate(expense.created_at)}
+                          </div>
+                          {expense.note && (
+                            <div className="text-xs max-w-[12rem] truncate text-muted-foreground mt-1 italic py-0.5 px-1.5 bg-slate-50 rounded">
+                              "{expense.note}"
+                            </div>
+                          )}
+                          <div className="mt-1.5">
+                            <span
+                              className={`text-xs ${
+                                isPaidByCurrentUser
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-orange-50 text-orange-700"
+                              } px-1.5 py-0.5 rounded-full font-medium inline-block`}
+                            >
+                              {isPaidByCurrentUser ? "You get" : "You owe"} $
+                              {(
+                                expense.amount / (expense.split_count || 3)
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
-  )
+  );
 }

@@ -1,30 +1,37 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { useToast } from "@/hooks/use-toast"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SignUpPage() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const supabase = createClientComponentClient()
+  const router = useRouter();
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const supabase = createClientComponentClient();
 
   const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
 
     try {
       const { error } = await supabase.auth.signUp({
@@ -32,33 +39,33 @@ export default function SignUpPage() {
         password,
         options: {
           data: {
-            name,
-          },
-        },
-      })
+            name
+          }
+        }
+      });
 
       if (error) {
-        throw error
+        throw error;
       }
 
       toast({
         title: "Account created!",
-        description: "Please check your email to confirm your account.",
-      })
+        description: "Please check your email to confirm your account."
+      });
 
       // In development, we can redirect directly since email confirmation might be disabled
-      router.push("/dashboard")
-      router.refresh()
+      router.push("/dashboard");
+      router.refresh();
     } catch (error: any) {
       toast({
         title: "Error creating account",
         description: error.message || "Please try again.",
-        variant: "destructive",
-      })
+        variant: "destructive"
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
@@ -67,13 +74,17 @@ export default function SignUpPage() {
           <Link href="/" className="inline-block font-bold text-2xl">
             WhoPaid
           </Link>
-          <p className="text-sm text-muted-foreground">Create an account to get started</p>
+          <p className="text-sm text-muted-foreground">
+            Create an account to get started
+          </p>
         </div>
         <Card>
           <form onSubmit={handleSignUp}>
             <CardHeader>
               <CardTitle>Sign Up</CardTitle>
-              <CardDescription>Enter your information to create an account</CardDescription>
+              <CardDescription>
+                Enter your information to create an account
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -82,7 +93,7 @@ export default function SignUpPage() {
                   id="name"
                   placeholder="Your name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={e => setName(e.target.value)}
                   required
                 />
               </div>
@@ -93,7 +104,7 @@ export default function SignUpPage() {
                   placeholder="name@example.com"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={e => setEmail(e.target.value)}
                   required
                 />
               </div>
@@ -103,7 +114,7 @@ export default function SignUpPage() {
                   id="password"
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={e => setPassword(e.target.value)}
                   required
                 />
               </div>
@@ -114,7 +125,10 @@ export default function SignUpPage() {
               </Button>
               <p className="mt-4 text-center text-sm text-muted-foreground">
                 Already have an account?{" "}
-                <Link href="/sign-in" className="text-primary underline-offset-4 hover:underline">
+                <Link
+                  href="/sign-in"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
                   Sign in
                 </Link>
               </p>
@@ -123,5 +137,5 @@ export default function SignUpPage() {
         </Card>
       </div>
     </div>
-  )
+  );
 }
