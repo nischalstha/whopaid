@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Trash2, UserPlus } from "lucide-react";
@@ -30,7 +30,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 
-export default function SettingsPage() {
+// Create a wrapper component that uses useSearchParams
+function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -399,12 +400,12 @@ export default function SettingsPage() {
     <div className="container max-w-2xl py-8">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center">
-        <Button variant="ghost" size="icon" asChild className="mr-2">
+          <Button variant="ghost" size="icon" asChild className="mr-2">
             <Link href={`/dashboard?group=${groupId}`}>
-            <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">Back</span>
-          </Link>
-        </Button>
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Back</span>
+            </Link>
+          </Button>
           <h1 className="text-xl font-bold">Group Control Room</h1>
         </div>
         {error && <div className="text-sm text-destructive">{error}</div>}
@@ -413,7 +414,7 @@ export default function SettingsPage() {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Group Identity Crisis</CardTitle>
+            <CardTitle>Group Name</CardTitle>
             <CardDescription>
               Change your group's name if it's having an identity crisis
             </CardDescription>
@@ -447,7 +448,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
-              <CardTitle>The Usual Suspects</CardTitle>
+              <CardTitle>Members</CardTitle>
               <CardDescription>Your fellow money-spenders</CardDescription>
             </div>
             {isAdmin && (
@@ -464,7 +465,7 @@ export default function SettingsPage() {
                   key={member.id}
                   className="flex items-center justify-between"
                 >
-                <div>
+                  <div>
                     <p className="font-medium">
                       {member.id === user?.id ? "You" : member.name}
                       {member.isAdmin && " (Admin)"}
@@ -472,15 +473,15 @@ export default function SettingsPage() {
                     <p className="text-sm text-muted-foreground">
                       {member.email}
                     </p>
-                </div>
+                  </div>
                   {isAdmin && member.id !== user?.id && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleRemoveMember(member.id)}
                     >
-                  Remove
-                </Button>
+                      Remove
+                    </Button>
                   )}
                 </div>
               ))}
@@ -513,9 +514,9 @@ export default function SettingsPage() {
                           onClick={() => handleRemoveInvitedUser(user.id)}
                         >
                           Cancel
-                </Button>
+                        </Button>
                       )}
-              </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -545,41 +546,41 @@ export default function SettingsPage() {
         </Card>
 
         {isCreator && (
-        <Card className="border-destructive">
-          <CardHeader>
+          <Card className="border-destructive">
+            <CardHeader>
               <CardTitle className="text-destructive">Nuclear Option</CardTitle>
               <CardDescription>
                 Press the big red button. We dare you.
               </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </CardHeader>
+            <CardContent>
               <Dialog
                 open={deleteDialogOpen}
                 onOpenChange={setDeleteDialogOpen}
               >
-              <DialogTrigger asChild>
-                <Button variant="destructive" className="w-full">
-                  <Trash2 className="mr-2 h-4 w-4" />
+                <DialogTrigger asChild>
+                  <Button variant="destructive" className="w-full">
+                    <Trash2 className="mr-2 h-4 w-4" />
                     Delete This Expense Hell
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
                     <DialogTitle>Woah, Slow Down There</DialogTitle>
-                  <DialogDescription>
+                    <DialogDescription>
                       This will permanently delete your group and all expense
                       history. Your friends might actually miss you in their
                       debt collection list.
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
                     <Button
                       variant="outline"
                       onClick={() => setDeleteDialogOpen(false)}
                       disabled={isDeleting}
                     >
-                    Cancel
-                  </Button>
+                      Cancel
+                    </Button>
                     <Button
                       variant="destructive"
                       onClick={handleDeleteGroup}
@@ -587,9 +588,9 @@ export default function SettingsPage() {
                     >
                       {isDeleting ? "Deleting..." : "Yes, delete group"}
                     </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         )}
@@ -615,5 +616,20 @@ export default function SettingsPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// Main component with Suspense
+export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container max-w-2xl py-8 flex justify-center">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 rounded-full border-t-transparent"></div>
+        </div>
+      }
+    >
+      <SettingsContent />
+    </Suspense>
   );
 }
