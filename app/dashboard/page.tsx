@@ -767,13 +767,17 @@ export default function DashboardPage() {
                 <i>actually</i> paid. No paywalls. No feature bloat. Just like
                 it should be.
               </p>
-              <GroupSelector
-                userId={user?.id || ""}
-                groups={[]}
-                currentGroup={null}
-                onGroupChange={handleGroupChange}
-                onOpenChange={setIsGroupSelectorOpen}
-              />
+              <Button
+                size="lg"
+                className="bg-green-600 hover:bg-green-700 mb-4"
+                onClick={() => setShowCreateGroupDialog(true)}
+              >
+                <PlusCircle className="h-5 w-5 mr-2" />
+                Create Your First Group
+              </Button>
+              <p className="text-sm text-muted-foreground mt-2">
+                It's free and always will be.
+              </p>
             </div>
           ) : (
             <div className="flex flex-col gap-4 sm:gap-6">
@@ -800,7 +804,13 @@ export default function DashboardPage() {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         >
-                          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                          <rect
+                            x="2"
+                            y="4"
+                            width="20"
+                            height="16"
+                            rx="2"
+                          ></rect>
                           <path d="M7 15h0M12 15h0M17 15h0"></path>
                         </svg>
                         Current Group
