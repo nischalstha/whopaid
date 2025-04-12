@@ -3,42 +3,19 @@ import { formatDistanceToNow } from "date-fns"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 
-const expenses = [
-  {
-    id: "1",
-    title: "Dinner in Reykjavík",
-    amount: 160,
-    paidBy: "You",
-    splitBetween: ["You", "Alex", "Priya", "Jordan"],
-    date: new Date(2025, 5, 15),
-  },
-  {
-    id: "2",
-    title: "Airbnb Cleaning",
-    amount: 80,
-    paidBy: "Priya",
-    splitBetween: ["You", "Alex", "Priya", "Jordan"],
-    date: new Date(2025, 5, 14),
-  },
-  {
-    id: "3",
-    title: "Rental Car",
-    amount: 320,
-    paidBy: "Alex",
-    splitBetween: ["You", "Alex", "Priya", "Jordan"],
-    date: new Date(2025, 5, 13),
-  },
-  {
-    id: "4",
-    title: "Groceries",
-    amount: 95.5,
-    paidBy: "Jordan",
-    splitBetween: ["You", "Alex", "Priya", "Jordan"],
-    date: new Date(2025, 5, 12),
-  },
-]
+type Expense = {
+  id: string
+  title: string
+  amount: number
+  paid_by: string
+  users: {
+    id: string
+    name: string
+  }
+  created_at: string
+}
 
-export function ExpenseList() {
+export function ExpenseList({ expenses, currentUserId }: { expenses: Expense[]; currentUserId: string }) {
   return (
     <div className="space-y-4">
       {expenses.length === 0 ? (
@@ -53,7 +30,9 @@ export function ExpenseList() {
             <CardContent className="p-0">
               <div className="flex items-center gap-4 p-4">
                 <Avatar className="h-10 w-10 border">
-                  <AvatarFallback>{expense.paidBy.charAt(0)}</AvatarFallback>
+                  <AvatarFallback>
+                    {expense.paid_by === currentUserId ? "Y" : expense.users.name.charAt(0)}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center justify-between">
@@ -61,10 +40,8 @@ export function ExpenseList() {
                     <p className="font-bold">${expense.amount.toFixed(2)}</p>
                   </div>
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <p>
-                      Paid by {expense.paidBy}, split {expense.splitBetween.length} ways
-                    </p>
-                    <p>{formatDistanceToNow(expense.date, { addSuffix: true })}</p>
+                    <p>Paid by {expense.paid_by === currentUserId ? "You" : expense.users.name}</p>
+                    <p>{formatDistanceToNow(new Date(expense.created_at), { addSuffix: true })}</p>
                   </div>
                 </div>
               </div>

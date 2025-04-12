@@ -3,6 +3,9 @@ import "@/app/globals.css"
 import { Inter } from "next/font/google"
 
 import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from "@/lib/auth-context"
+import { Toaster } from "@/components/ui/toaster"
+import { DatabaseInitializer } from "@/components/database-initializer"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -21,7 +24,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
+          <AuthProvider>
+            {/* This component will initialize the database when the app loads */}
+            <DatabaseInitializer />
+            {children}
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
