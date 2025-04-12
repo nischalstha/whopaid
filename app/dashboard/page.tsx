@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PlusCircle, X } from "lucide-react";
 import Link from "next/link";
 import {
@@ -41,6 +41,7 @@ interface ExpensesByMember {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isLoading } = useAuth();
 
   interface Group {
@@ -135,6 +136,7 @@ export default function DashboardPage() {
   // Add error state for create group
   const [createGroupError, setCreateGroupError] = useState<string | null>(null);
 
+  // Add necessary helper functions
   const calculateExpensesByMember = (expenses: any[], groupMembers: any[]) => {
     const colors = [
       "#4ade80",
@@ -421,20 +423,7 @@ export default function DashboardPage() {
     }
   };
 
-  // Effect to handle URL changes
-  useEffect(() => {
-    if (typeof window !== "undefined" && groups.length > 0) {
-      const params = new URLSearchParams(window.location.search);
-      const groupId = params.get("group");
-
-      const group = groupId ? groups.find(g => g.id === groupId) : groups[0];
-
-      if (group && (!currentGroup || currentGroup.id !== group.id)) {
-        handleGroupChange(group);
-      }
-    }
-  }, [groups, window?.location.search]);
-
+  // Handle URL changes & initialize data
   useEffect(() => {
     if (isLoading) return;
 
@@ -443,7 +432,7 @@ export default function DashboardPage() {
       return;
     }
 
-    const fetchData = async () => {
+    const fetchInitialData = async () => {
       setIsLoadingData(true);
       console.log("Starting data fetch with user ID:", user.id);
 
@@ -462,8 +451,6 @@ export default function DashboardPage() {
           setIsLoadingData(false);
           return;
         }
-
-        console.log("Test query successful:", testData);
 
         // If we're here, tables exist, so fetch user's groups
         const { data: userGroups, error: groupsError } = await supabase
@@ -499,27 +486,28 @@ export default function DashboardPage() {
         }));
         setGroups(fetchedGroups);
 
-        // Get the current group from URL or default to first one
-        const params = new URLSearchParams(window.location.search);
-        const groupId = params.get("group");
-        const group = groupId
-          ? fetchedGroups.find(g => g.id === groupId)
-          : fetchedGroups[0];
+        if (fetchedGroups.length > 0) {
+          // Get the current group from URL or default to first one
+          const groupId = searchParams.get("group");
+          const group = groupId
+            ? fetchedGroups.find(g => g.id === groupId)
+            : fetchedGroups[0];
 
-        if (group) {
-          setCurrentGroup(group);
-          await fetchGroupData(group);
+          if (group) {
+            setCurrentGroup(group);
+            await fetchGroupData(group);
+          }
         }
       } catch (error: any) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching initial data:", error);
         setDatabaseError(error.message || "An unexpected error occurred");
       } finally {
         setIsLoadingData(false);
       }
     };
 
-    fetchData();
-  }, [user, isLoading, supabase, router]);
+    fetchInitialData();
+  }, [isLoading, user, supabase, router, searchParams]); // Include searchParams dependency for URL changes
 
   // Add a function to handle filtering
   const handleFilterByUser = (userId: string) => {
@@ -800,10 +788,90 @@ export default function DashboardPage() {
                   />
                   {currentGroup && (
                     <div className="ml-3 pl-3 border-l border-slate-200 hidden sm:block">
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                          <path d="M7 15h0M12 15h0M17 15h0"></path>
+                        </svg>
                         Current Group
                       </span>
                       <h2 className="font-semibold">{currentGroup.name}</h2>
+                    </div>
+                  )}
+                  <div className="ml-3 pl-3 border-l border-slate-200 hidden md:block"></div>
+                  {currentGroup && (
+                    <div className="ml-3 pl-3 border-l border-slate-200 hidden sm:block">
+                      <span className="text-xs text-slate-500 mb-1 flex items-center gap-1">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="9" cy="7" r="4"></circle>
+                          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        Group Members
+                      </span>
+                      {groupMembers.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1 max-w-[200px]">
+                          {groupMembers.map((member, idx) => (
+                            <div
+                              key={member.user_id}
+                              onClick={() => handleFilterByUser(member.user_id)}
+                              className={`group relative inline-flex h-7 items-center rounded-full px-2 text-xs font-medium transition-colors cursor-pointer ${
+                                member.user_id === user?.id
+                                  ? "bg-green-100 text-green-800 hover:bg-green-200"
+                                  : member.type === "invited"
+                                  ? "bg-slate-100 text-slate-600 border border-dashed border-slate-300 hover:bg-slate-200"
+                                  : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                              } ${
+                                member.user_id === filteredUserId
+                                  ? "ring-2 ring-offset-1 ring-blue-400"
+                                  : ""
+                              }`}
+                              title={`Click to filter expenses by ${
+                                member.user_id === user?.id
+                                  ? "you"
+                                  : member.users.name
+                              }`}
+                            >
+                              <span className="font-bold mr-1">
+                                {member.users.name
+                                  .split(" ")
+                                  .map(n => n[0])
+                                  .join("")
+                                  .toUpperCase()
+                                  .substring(0, 2)}
+                              </span>
+                              {member.user_id === user?.id ? (
+                                <span>(You)</span>
+                              ) : (
+                                <span className="truncate max-w-[60px]">
+                                  {member.users.name.split(" ")[0]}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}{" "}
                     </div>
                   )}
                 </div>
@@ -896,7 +964,7 @@ export default function DashboardPage() {
                             <span className="hidden xs:inline">
                               Add Expense
                             </span>
-                            <span className="xs:hidden">Add</span>
+                            <span className="xs:hidden"> Add Expense</span>
                           </Button>
                         }
                         groupId={currentGroup?.id}
@@ -952,35 +1020,6 @@ export default function DashboardPage() {
                         expenses={filteredExpenses}
                         currentUserId={user?.id || ""}
                       />
-                      {filteredExpenses.length === 0 && (
-                        <div className="p-8 text-center">
-                          <div className="mx-auto w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-3">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="24"
-                              height="24"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="text-blue-500"
-                            >
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <line x1="12" y1="8" x2="12" y2="12"></line>
-                              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                            </svg>
-                          </div>
-                          <h3 className="text-lg font-medium">
-                            No expenses yet. Lucky you.
-                          </h3>
-                          <p className="text-muted-foreground text-sm">
-                            Or maybe someone's freeloading? Add that
-                            suspiciously overpriced boat ride.
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </CardContent>
                 </Card>

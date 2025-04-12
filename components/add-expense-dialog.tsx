@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ export function AddExpenseDialog({
     groupMembers.map(member => member.id)
   );
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [showSuccess, setShowSuccess] = React.useState(false);
 
   const handleMemberToggle = (value: string) => {
     setSelectedMembers(prev =>
@@ -117,26 +119,32 @@ export function AddExpenseDialog({
         }
       });
 
+      // Call the server action which handles revalidation internally
       const result = await addExpense(formData);
 
       if (result.error) {
         throw new Error(result.error);
       }
 
+      // Show success animation
+      setShowSuccess(true);
+
+      // Hide success animation after 1.5 seconds and close dialog
+      setTimeout(() => {
+        setShowSuccess(false);
+        setOpen(false);
+
+        // Force a reload but after dialog is closed and server has time to update
+        setTimeout(() => {
+          // This ensures fresh data is loaded from the server
+          window.location.href = window.location.href;
+        }, 100);
+      }, 1500);
+
       toast({
         title: "Expense added!",
         description: "Your expense has been added successfully."
       });
-
-      setOpen(false);
-
-      // Force a complete refresh to ensure all data is updated
-      router.refresh();
-
-      // Use a slight delay before reloading the page to ensure server-side data is updated
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
     } catch (error: any) {
       toast({
         title: "Error adding expense",
@@ -152,6 +160,86 @@ export function AddExpenseDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
+        <AnimatePresence>
+          {showSuccess ? (
+            <motion.div
+              className="absolute inset-0 bg-green-50 flex flex-col items-center justify-center z-10 rounded-lg"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.3 }}
+            >
+              <motion.div
+                className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4"
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{
+                  scale: [0.5, 1.2, 1],
+                  opacity: 1
+                }}
+                transition={{
+                  duration: 0.5,
+                  times: [0, 0.7, 1]
+                }}
+              >
+                <motion.svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-10 w-10 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.5 }}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </motion.svg>
+              </motion.div>
+              <motion.h2
+                className="text-xl font-bold text-green-800 mb-2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                Expense Added!
+              </motion.h2>
+              <motion.div
+                className="text-green-600"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
+                <motion.div
+                  className="flex gap-1 items-center"
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                  <span>Refreshing data...</span>
+                </motion.div>
+              </motion.div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Add Expense</DialogTitle>

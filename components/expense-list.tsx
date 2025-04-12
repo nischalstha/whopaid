@@ -1,8 +1,3 @@
-import { formatDistanceToNow } from "date-fns";
-
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
-
 type Expense = {
   id: string;
   title: string;
@@ -108,10 +103,41 @@ export function ExpenseList({
     }
   };
 
+  // Helper to get mood color based on amount
+  const getMoodColor = (amount: number) => {
+    if (amount > 200)
+      return { bg: "rgba(254, 202, 202, 0.5)", text: "text-red-700" };
+    if (amount > 100)
+      return { bg: "rgba(254, 215, 170, 0.5)", text: "text-orange-700" };
+    if (amount > 50)
+      return { bg: "rgba(254, 240, 138, 0.5)", text: "text-yellow-700" };
+    return { bg: "rgba(187, 247, 208, 0.5)", text: "text-green-700" };
+  };
+
   return (
     <div className="divide-y">
       {expenses.length === 0 ? (
-        <div className="p-4 text-center text-muted-foreground"></div>
+        <div className="p-6 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-8 w-8 text-blue-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <p className="text-muted-foreground font-medium">
+            Nothing to see here yet. Time to spot someone the bill?
+          </p>
+        </div>
       ) : (
         <div className="relative">
           {groupedExpenses.map(group => (
@@ -124,9 +150,10 @@ export function ExpenseList({
               <div className="relative">
                 <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-slate-200"></div>
 
-                {group.expenses.map(expense => {
+                {group.expenses.map((expense, index) => {
                   const isPaidByCurrentUser = expense.paid_by === currentUserId;
                   const amountColorClass = getAmountColorClass(expense.amount);
+                  const moodColor = getMoodColor(expense.amount);
 
                   return (
                     <div

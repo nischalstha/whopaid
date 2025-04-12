@@ -126,7 +126,9 @@ export async function addExpense(formData: FormData) {
 
     if (splitError) throw splitError;
 
+    // Ensure proper revalidation of the dashboard route
     revalidatePath("/dashboard");
+
     return { success: true, expenseId: expense.id };
   } catch (error: any) {
     console.error("Error adding expense:", error);
