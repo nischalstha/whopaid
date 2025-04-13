@@ -44,22 +44,13 @@ export function BalanceSummary({
           p_group_id: groupId
         });
 
-        if (error) {
-          // Check if the error is because the function doesn't exist
-          if (
-            error.message.includes("function") &&
-            error.message.includes("does not exist")
-          ) {
-            // Try to initialize the database
-            await fetch("/api/init-database");
-            setError(
-              "Balance calculation is being set up. Please refresh in a moment."
-            );
-            setIsLoading(false);
-            return;
-          }
+        console.log("get_balances data:", data); // Debugging log
 
-          throw error;
+        if (error) {
+          console.error("Error fetching balances:", error); // Debugging log
+          setError(error.message || "Failed to fetch balances");
+          setIsLoading(false);
+          return;
         }
 
         if (data) {
@@ -67,6 +58,8 @@ export function BalanceSummary({
           const currentUserBalance = data.find(
             (b: BalanceData) => b.user_id === userId
           );
+
+          console.log("Current user balance:", currentUserBalance); // Debugging log
 
           // If not found (might be invited user), we need to handle differently
           if (!currentUserBalance) {
@@ -87,12 +80,22 @@ export function BalanceSummary({
 
             if (currentInvitedUser) {
               // Process balances for an invited user
-              const processedBalances = data.map((balance: BalanceData) => ({
-                person: balance.user_name,
-                amount: Math.abs(balance.balance),
-                direction:
-                  balance.balance > 0 ? "owe" : ("owed" as "owe" | "owed")
-              }));
+              const processedBalances = data
+                .filter((b: BalanceData) => b.user_id !== userId) // Filter out current user
+                .map((balance: BalanceData) => ({
+                  person: balance.user_name,
+                  amount: Math.abs(balance.balance),
+                  direction:
+                    balance.balance > 0 ? "owe" : ("owed" as "owe" | "owed")
+                }))
+                // Filter out zero-amount balances to avoid confusion
+                .filter(
+                  (balance: {
+                    person: string;
+                    amount: number;
+                    direction: "owe" | "owed";
+                  }) => balance.amount > 0
+                );
 
               setBalances(processedBalances);
               setIsLoading(false);
@@ -104,28 +107,75 @@ export function BalanceSummary({
           const processedBalances = data
             .filter((b: BalanceData) => b.user_id !== userId)
             .map((balance: BalanceData) => {
-              // If current user has positive balance, others owe them
-              // If current user has negative balance, they owe others
-              const relativeToCurrent = currentUserBalance?.balance || 0;
+              // Get my balance
+              const myBalance = currentUserBalance?.balance || 0;
 
-              if (relativeToCurrent > 0) {
-                // Current user is owed money
+              // Case 1: I'm viewing as someone who paid (positive balance)
+              if (myBalance > 0) {
+                // Others with negative balance owe me
                 return {
                   person: balance.user_name,
-                  amount: Math.abs(balance.balance),
-                  direction:
-                    balance.balance < 0 ? "owed" : ("owe" as "owe" | "owed")
-                };
-              } else {
-                // Current user owes money
-                return {
-                  person: balance.user_name,
-                  amount: Math.abs(balance.balance),
-                  direction:
-                    balance.balance > 0 ? "owe" : ("owed" as "owe" | "owed")
+                  amount: Math.abs(balance.balance), // They owe exactly what their negative balance shows
+                  direction: balance.balance < 0 ? "owed" : "owe"
                 };
               }
-            });
+
+              // Case 2: I'm viewing as someone who owes (negative balance)
+              else if (myBalance < 0) {
+                // I only owe people with positive balance
+                if (balance.balance > 0) {
+                  // Calculate my share of what I owe this person
+                  // This is a proportional calculation based on their positive balance
+                  const totalPositiveBalance = data
+                    .filter((u: BalanceData) => u.balance > 0)
+                    .reduce(
+                      (sum: number, u: BalanceData) => sum + u.balance,
+                      0
+                    );
+
+                  // If there's no positive balance, don't show any debt
+                  if (totalPositiveBalance <= 0) {
+                    return {
+                      person: balance.user_name,
+                      amount: 0,
+                      direction: "owe"
+                    };
+                  }
+
+                  return {
+                    person: balance.user_name,
+                    amount: Math.abs(
+                      myBalance * (balance.balance / totalPositiveBalance)
+                    ),
+                    direction: "owe"
+                  };
+                } else {
+                  // People with negative balance like me don't owe each other
+                  return {
+                    person: balance.user_name,
+                    amount: 0,
+                    direction: "owe" // Direction doesn't matter since amount is 0
+                  };
+                }
+              }
+
+              // Case 3: I'm perfectly balanced (unlikely but possible)
+              else {
+                return {
+                  person: balance.user_name,
+                  amount: 0,
+                  direction: "owe" // Direction doesn't matter since amount is 0
+                };
+              }
+            })
+            // Filter out zero-amount balances to avoid confusion
+            .filter(
+              (balance: {
+                person: string;
+                amount: number;
+                direction: "owe" | "owed";
+              }) => balance.amount > 0
+            );
 
           setBalances(processedBalances);
         }
