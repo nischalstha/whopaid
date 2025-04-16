@@ -363,7 +363,7 @@ function DashboardContent() {
                 .single()
                 .then(({ data }) => data);
 
-          // Get split details
+          // Get split details with all necessary information
           const { data: splitDetails } = await supabase
             .from("expense_splits")
             .select(
@@ -376,25 +376,33 @@ function DashboardContent() {
             )
             .eq("expense_id", expense.id);
 
-          // Get names of people involved in the split
-          const splitNames = await Promise.all(
+          // Get names and IDs of people involved in the split
+          const splitDetailsWithNames = await Promise.all(
             (splitDetails || []).map(async split => {
               if (split.is_invited_user) {
                 // Try to get from invited_users
                 const { data } = await supabase
                   .from("invited_users")
-                  .select("name")
+                  .select("id, name")
                   .eq("id", split.user_id)
                   .single();
-                return data?.name || "Unknown";
+                return {
+                  id: data?.id || split.user_id,
+                  name: data?.name || split.invited_user_email || "Unknown",
+                  is_invited: true
+                };
               } else {
                 // Get from users
                 const { data } = await supabase
                   .from("users")
-                  .select("name")
+                  .select("id, name")
                   .eq("id", split.user_id)
                   .single();
-                return data?.name || "Unknown";
+                return {
+                  id: data?.id || split.user_id,
+                  name: data?.name || "Unknown",
+                  is_invited: false
+                };
               }
             })
           );
@@ -403,7 +411,8 @@ function DashboardContent() {
             ...expense,
             users: userDetails || { id: expense.paid_by, name: "Unknown User" },
             split_count: splitDetails?.length || 0,
-            split_with: splitNames
+            split_with: splitDetailsWithNames.map(split => split.name),
+            split_with_ids: splitDetailsWithNames.map(split => split.id)
           };
         })
       );
@@ -1029,6 +1038,9 @@ function DashboardContent() {
                       <ExpenseList
                         expenses={filteredExpenses}
                         currentUserId={user?.id || ""}
+                        currentUserName={
+                          user?.user_metadata?.name || "Unknown User"
+                        }
                       />
                     </div>
                   </CardContent>

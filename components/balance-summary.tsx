@@ -12,6 +12,14 @@ interface BalanceData {
   user_id: string;
   user_name: string;
   balance: number;
+  user_type: string; // Add the user_type field
+}
+
+interface ProcessedBalance {
+  person: string;
+  amount: number;
+  direction: "owe" | "owed";
+  userType: string;
 }
 
 export function BalanceSummary({
@@ -24,7 +32,12 @@ export function BalanceSummary({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [balances, setBalances] = useState<
-    { person: string; amount: number; direction: "owe" | "owed" }[]
+    {
+      person: string;
+      amount: number;
+      direction: "owe" | "owed";
+      userType: string;
+    }[]
   >([]);
   const supabase = createClientComponentClient();
 
@@ -40,149 +53,105 @@ export function BalanceSummary({
 
       try {
         // Fetch balances using the get_balances function
-        const { data, error } = await supabase.rpc("get_balances", {
-          p_group_id: groupId
-        });
+        const { data: balanceData, error: balanceError } = await supabase.rpc(
+          "get_balances",
+          {
+            p_group_id: groupId
+          }
+        );
 
-        console.log("get_balances data:", data); // Debugging log
+        console.log("get_balances data:", balanceData); // Debugging log
 
-        if (error) {
-          console.error("Error fetching balances:", error); // Debugging log
-          setError(error.message || "Failed to fetch balances");
+        if (balanceError) {
+          console.error("Error fetching balances:", balanceError); // Debugging log
+          setError(balanceError.message || "Failed to fetch balances");
           setIsLoading(false);
           return;
         }
 
-        if (data) {
-          // Find if the current user is in the response data
-          const currentUserBalance = data.find(
-            (b: BalanceData) => b.user_id === userId
-          );
+        // Find if the current user is in the response data
+        const currentUserBalance = balanceData?.find(
+          (b: BalanceData) => b.user_id === userId
+        );
 
-          console.log("Current user balance:", currentUserBalance); // Debugging log
+        console.log("Current user balance:", currentUserBalance); // Debugging log
 
-          // If not found (might be invited user), we need to handle differently
-          if (!currentUserBalance) {
-            // Get invited user records to find if current user is an invited user
-            const { data: invitedUsers, error: invitedError } = await supabase
-              .from("invited_users")
-              .select("*")
-              .eq("group_id", groupId);
-
-            if (invitedError) throw invitedError;
-
-            // Check if the current user is among invited users
-            const currentInvitedUser = invitedUsers?.find(u => {
-              // Some authentication systems store emails in different casing
-              // Normalize emails to lowercase for comparison
-              return u.id === userId;
+        // If the current user has a negative balance (they owe money), fetch settlements
+        if (currentUserBalance && currentUserBalance.balance < 0) {
+          // Use the new get_settlements function to get who the user owes money to
+          const { data: settlementsData, error: settlementsError } =
+            await supabase.rpc("get_settlements", {
+              p_group_id: groupId,
+              p_user_id: userId
             });
 
-            if (currentInvitedUser) {
-              // Process balances for an invited user
-              const processedBalances = data
-                .filter((b: BalanceData) => b.user_id !== userId) // Filter out current user
-                .map((balance: BalanceData) => ({
-                  person: balance.user_name,
-                  amount: Math.abs(balance.balance),
-                  direction:
-                    balance.balance > 0 ? "owe" : ("owed" as "owe" | "owed")
-                }))
-                // Filter out zero-amount balances to avoid confusion
-                .filter(
-                  (balance: {
-                    person: string;
-                    amount: number;
-                    direction: "owe" | "owed";
-                  }) => balance.amount > 0
-                );
-
-              setBalances(processedBalances);
-              setIsLoading(false);
-              return;
-            }
+          if (settlementsError) {
+            console.error("Error fetching settlements:", settlementsError);
+            setError(settlementsError.message || "Failed to fetch settlements");
+            setIsLoading(false);
+            return;
           }
 
-          // Process other users' balances relative to current user (for registered users)
-          const processedBalances = data
-            .filter((b: BalanceData) => b.user_id !== userId)
+          console.log("Settlements data:", settlementsData);
+
+          // Process the settlements data
+          const processedBalances = settlementsData.map((settlement: any) => ({
+            person: settlement.person,
+            amount: settlement.amount,
+            direction: settlement.direction as "owe" | "owed",
+            userType: settlement.userType
+          }));
+
+          setBalances(processedBalances);
+          setIsLoading(false);
+          return;
+        }
+
+        // If the current user has a positive balance (others owe them), calculate who owes them
+        if (currentUserBalance && currentUserBalance.balance > 0) {
+          // For users who are owed money, we need to calculate who owes them
+          // This is a bit more complex and might need a separate function in the future
+          // For now, we'll use a simplified approach
+          const processedBalances = balanceData
+            .filter((b: BalanceData) => b.user_id !== userId && b.balance < 0)
             .map((balance: BalanceData) => {
-              // Get my balance
-              const myBalance = currentUserBalance?.balance || 0;
+              // Calculate what portion of their debt is owed to me
+              const totalNegativeBalance = balanceData
+                .filter((u: BalanceData) => u.balance < 0)
+                .reduce(
+                  (sum: number, u: BalanceData) => sum + Math.abs(u.balance),
+                  0
+                );
 
-              // Case 1: I'm viewing as someone who paid (positive balance)
-              if (myBalance > 0) {
-                // Others with negative balance owe me
-                return {
-                  person: balance.user_name,
-                  amount: Math.abs(balance.balance), // They owe exactly what their negative balance shows
-                  direction: balance.balance < 0 ? "owed" : "owe"
-                };
-              }
+              // Calculate proportional share of what they owe me
+              const share = currentUserBalance.balance / totalNegativeBalance;
+              const directDebt = Math.abs(balance.balance) * share;
 
-              // Case 2: I'm viewing as someone who owes (negative balance)
-              else if (myBalance < 0) {
-                // I only owe people with positive balance
-                if (balance.balance > 0) {
-                  // Calculate my share of what I owe this person
-                  // This is a proportional calculation based on their positive balance
-                  const totalPositiveBalance = data
-                    .filter((u: BalanceData) => u.balance > 0)
-                    .reduce(
-                      (sum: number, u: BalanceData) => sum + u.balance,
-                      0
-                    );
-
-                  // If there's no positive balance, don't show any debt
-                  if (totalPositiveBalance <= 0) {
-                    return {
-                      person: balance.user_name,
-                      amount: 0,
-                      direction: "owe"
-                    };
-                  }
-
-                  return {
-                    person: balance.user_name,
-                    amount: Math.abs(
-                      myBalance * (balance.balance / totalPositiveBalance)
-                    ),
-                    direction: "owe"
-                  };
-                } else {
-                  // People with negative balance like me don't owe each other
-                  return {
-                    person: balance.user_name,
-                    amount: 0,
-                    direction: "owe" // Direction doesn't matter since amount is 0
-                  };
-                }
-              }
-
-              // Case 3: I'm perfectly balanced (unlikely but possible)
-              else {
-                return {
-                  person: balance.user_name,
-                  amount: 0,
-                  direction: "owe" // Direction doesn't matter since amount is 0
-                };
-              }
+              return {
+                person: balance.user_name,
+                amount: Math.round(directDebt * 100) / 100,
+                direction: "owed" as "owe" | "owed",
+                userType: balance.user_type
+              };
             })
-            // Filter out zero-amount balances to avoid confusion
-            .filter(
-              (balance: {
-                person: string;
-                amount: number;
-                direction: "owe" | "owed";
-              }) => balance.amount > 0
+            // Filter out zero or very small amounts
+            .filter((balance: ProcessedBalance) => balance.amount > 0.01)
+            // Sort by amount descending
+            .sort(
+              (a: ProcessedBalance, b: ProcessedBalance) => b.amount - a.amount
             );
 
           setBalances(processedBalances);
+          setIsLoading(false);
+          return;
         }
+
+        // If the current user has a zero balance, there's nothing to show
+        setBalances([]);
+        setIsLoading(false);
       } catch (error: any) {
         console.error("Error fetching balances:", error);
         setError(error.message || "Failed to fetch balances");
-      } finally {
         setIsLoading(false);
       }
     };
@@ -221,6 +190,18 @@ export function BalanceSummary({
         0.5 + intensity * 0.5
       }) 0%, rgba(248, 180, 180, ${0.4 + intensity * 0.6}) 100%)`;
     }
+  };
+
+  // Helper to get user type badge
+  const getUserTypeBadge = (userType: string) => {
+    if (userType === "invited") {
+      return (
+        <span className="ml-1 text-xs px-1 py-0.5 bg-blue-50 text-blue-600 rounded-full">
+          Invited
+        </span>
+      );
+    }
+    return null;
   };
 
   return (
@@ -417,10 +398,11 @@ export function BalanceSummary({
                           )}
                         </div>
                         <div>
-                          <p className="font-medium text-sm leading-tight">
+                          <p className="font-medium text-sm leading-tight flex items-center">
                             {balance.direction === "owe"
                               ? `You owe ${balance.person}`
                               : `${balance.person} owes you`}
+                            {getUserTypeBadge(balance.userType)}
                           </p>
                         </div>
                       </div>

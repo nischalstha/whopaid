@@ -11,14 +11,17 @@ type Expense = {
   note?: string | null;
   split_count?: number;
   split_with?: string[];
+  split_with_ids?: string[];
 };
 
 export function ExpenseList({
   expenses,
-  currentUserId
+  currentUserId,
+  currentUserName
 }: {
   expenses: Expense[];
   currentUserId: string;
+  currentUserName: string;
 }) {
   // Helper function to format date
   const formatDate = (dateString: string) => {
@@ -141,110 +144,123 @@ export function ExpenseList({
       ) : (
         <div className="relative">
           {groupedExpenses.map(group => (
-            <div key={group.date} className="mb-4">
+            <div key={group.date} className="mb-6">
               <div className="sticky top-0 z-10 bg-white border-b p-3 shadow-sm">
                 <h3 className="font-medium text-xs text-slate-500">
                   {group.formattedDate}
                 </h3>
               </div>
-              <div className="relative">
-                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-slate-200"></div>
+              <div className="relative pl-6">
+                {/* Timeline line */}
+                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-400 to-blue-200"></div>
 
                 {group.expenses.map((expense, index) => {
                   const isPaidByCurrentUser = expense.paid_by === currentUserId;
+                  const isIncludedInSplit =
+                    expense.split_with_ids?.includes(currentUserId);
                   const amountColorClass = getAmountColorClass(expense.amount);
                   const moodColor = getMoodColor(expense.amount);
 
                   return (
-                    <div
-                      key={expense.id}
-                      className="relative z-0 pl-10 pr-3 py-3 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-none"
-                    >
-                      <div className="absolute left-5 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white border-2 border-slate-300 z-10"></div>
+                    <div key={expense.id} className="relative mb-6">
+                      {/* Timeline dot */}
+                      <div className="absolute left-5 top-4 w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow-sm"></div>
 
-                      <div className="flex justify-between items-start gap-3">
-                        <div className="flex items-start gap-2">
-                          <div
-                            className={`w-8 h-8 rounded-full bg-gradient-to-br ${amountColorClass} flex items-center justify-center text-xs font-semibold border shadow-sm flex-shrink-0`}
-                          >
-                            {expense.users.name
-                              .split(" ")
-                              .map(name => name.charAt(0))
-                              .join("")
-                              .toUpperCase()
-                              .substring(0, 2)}
+                      <div className="ml-6 bg-white rounded-lg border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start space-x-4">
+                            {/* Payer avatar */}
+                            <div className="flex-shrink-0">
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-600 font-medium shadow-sm border border-blue-100">
+                                {expense.users.name
+                                  .split(" ")
+                                  .map((n, i) => n.charAt(0).toUpperCase())
+                                  .join("")}
+                              </div>
+                            </div>
+
+                            <div className="flex-1">
+                              <div className="flex items-center">
+                                <h3 className="text-base font-medium text-slate-900">
+                                  {expense.title}
+                                </h3>
+                                <span className="ml-2 text-xs text-slate-400">
+                                  {formatDate(expense.created_at)}
+                                </span>
+                              </div>
+
+                              <p className="mt-1 text-sm text-slate-500">
+                                Paid by{" "}
+                                <span className="font-medium">
+                                  {expense.users.name}
+                                </span>
+                              </p>
+
+                              {expense.note && (
+                                <p className="mt-2 text-sm text-slate-600 italic border-l-2 border-blue-200 pl-2">
+                                  "{expense.note}"
+                                </p>
+                              )}
+
+                              {/* Split with section */}
+                              {expense.split_with &&
+                                expense.split_with.length > 0 && (
+                                  <div className="mt-3">
+                                    <div className="flex items-center mb-1">
+                                      <span className="text-xs font-medium text-slate-500 mr-2">
+                                        Split with:
+                                      </span>
+                                      <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
+                                        {expense.split_count ||
+                                          expense.split_with.length}{" "}
+                                        people
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {expense.split_with.map((name, i) => (
+                                        <div
+                                          key={i}
+                                          className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full"
+                                        >
+                                          {name}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                            </div>
                           </div>
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <h3 className="font-medium text-sm">
-                                {expense.title}
-                              </h3>
-                              <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full inline-flex items-center">
-                                {expense.split_count || 3} 👥
+
+                          <div className="text-right">
+                            <p
+                              className={`text-lg font-semibold ${amountColorClass}`}
+                            >
+                              ${expense.amount.toFixed(2)}
+                            </p>
+                            <div className="mt-2">
+                              <span
+                                className={`text-xs ${
+                                  isPaidByCurrentUser
+                                    ? "bg-green-100 text-green-700 border border-green-200"
+                                    : isIncludedInSplit
+                                    ? "bg-orange-100 text-orange-700 border border-orange-200"
+                                    : "bg-gray-100 text-gray-700 border border-gray-200"
+                                } px-2 py-1 rounded-full font-medium inline-block`}
+                              >
+                                {isPaidByCurrentUser
+                                  ? "You get"
+                                  : isIncludedInSplit
+                                  ? "You owe"
+                                  : "Not included"}{" "}
+                                $
+                                {isIncludedInSplit
+                                  ? (
+                                      expense.amount /
+                                      (expense.split_count || 1)
+                                    ).toFixed(2)
+                                  : "0.00"}
                               </span>
                             </div>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 mr-1"></span>
-                              {isPaidByCurrentUser ? (
-                                <span>
-                                  You paid{" "}
-                                  <span className="font-medium">
-                                    ${expense.amount.toFixed(2)}
-                                  </span>
-                                </span>
-                              ) : (
-                                <span>
-                                  <span className="font-medium">
-                                    {expense.users.name}
-                                  </span>{" "}
-                                  paid{" "}
-                                  <span className="font-medium">
-                                    ${expense.amount.toFixed(2)}
-                                  </span>
-                                </span>
-                              )}
-                            </p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {(expense.split_with || [])
-                                .slice(0, 3)
-                                .map((person, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center px-1.5 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full"
-                                  >
-                                    {person}
-                                  </span>
-                                ))}
-                              {(expense.split_with || []).length > 3 && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full">
-                                  +{(expense.split_with || []).length - 3} more
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right min-w-[120px] flex-shrink-0">
-                          <div className="text-xs font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded inline-block">
-                            {formatDate(expense.created_at)}
-                          </div>
-                          {expense.note && (
-                            <div className="text-xs max-w-[12rem] truncate text-muted-foreground mt-1 italic py-0.5 px-1.5 bg-slate-50 rounded">
-                              "{expense.note}"
-                            </div>
-                          )}
-                          <div className="mt-1.5">
-                            <span
-                              className={`text-xs ${
-                                isPaidByCurrentUser
-                                  ? "bg-green-50 text-green-700"
-                                  : "bg-orange-50 text-orange-700"
-                              } px-1.5 py-0.5 rounded-full font-medium inline-block`}
-                            >
-                              {isPaidByCurrentUser ? "You get" : "You owe"} $
-                              {(
-                                expense.amount / (expense.split_count || 3)
-                              ).toFixed(2)}
-                            </span>
                           </div>
                         </div>
                       </div>

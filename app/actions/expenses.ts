@@ -120,11 +120,14 @@ export async function addExpense(formData: FormData) {
       }
     });
 
-    const { error: splitError } = await supabase
-      .from("expense_splits")
-      .insert(splitInserts);
+    // Only insert expense splits for users who are actually included in the split
+    if (splitInserts.length > 0) {
+      const { error: splitError } = await supabase
+        .from("expense_splits")
+        .insert(splitInserts);
 
-    if (splitError) throw splitError;
+      if (splitError) throw splitError;
+    }
 
     // Ensure proper revalidation of the dashboard route
     revalidatePath("/dashboard");
